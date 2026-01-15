@@ -17,21 +17,25 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: demo
-          POSTGRES_USER: demo
-          POSTGRES_PASSWORD: demo
+          POSTGRES_DB: ${{ secrets.FLYWAY_DB }}
+          POSTGRES_USER: ${{ secrets.FLYWAY_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U demo"
+          --health-cmd="pg_isready -U ${{ secrets.FLYWAY_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     env:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/demo
-      SPRING_DATASOURCE_USERNAME: demo
-      SPRING_DATASOURCE_PASSWORD: demo
+      SPRING_DATASOURCE_URL: ${{ secrets.FLYWAY_URL }}
+      SPRING_DATASOURCE_USERNAME: ${{ secrets.FLYWAY_USER }}
+      SPRING_DATASOURCE_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
+      FLYWAY_URL: ${{ secrets.FLYWAY_URL }}
+      FLYWAY_USER: ${{ secrets.FLYWAY_USER }}
+      FLYWAY_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
+      FLYWAY_DB: ${{ secrets.FLYWAY_DB }}
 
     steps:
       - name: Checkout
@@ -46,12 +50,15 @@ jobs:
       - name: Build
         run: mvn clean package -DskipTests
 
-      - name: Run Flyway migrations
-        run: mvn flyway:migrate
+      - name: Validate Flyway migrations
+        run: mvn flyway:validate \
+              -Dflyway.url=${{ env.FLYWAY_URL }} \
+              -Dflyway.user=${{ env.FLYWAY_USER }} \
+              -Dflyway.password=${{ env.FLYWAY_PASSWORD }}
 
       - name: Start app
         run: mvn spring-boot:run &
-      
+
       - name: Wait for app health
         run: |
           for i in {1..20}; do
@@ -83,6 +90,13 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+
+            export POSTGRES_DB=${{ secrets.FLYWAY_DB }}
+            export POSTGRES_USER=${{ secrets.FLYWAY_USER }}
+            export POSTGRES_PASSWORD=${{ secrets.FLYWAY_PASSWORD }}
+            export SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
+            export SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+            export SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
 
             cd ~/springboot-quick-boot
             git pull
