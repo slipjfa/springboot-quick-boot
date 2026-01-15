@@ -17,9 +17,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: ${{ secrets.FLYWAY_DB }}
-          POSTGRES_USER: ${{ secrets.FLYWAY_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
+          POSTGRES_DB: demo
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
         ports:
           - 5432:5432
         options: >-
@@ -52,9 +52,9 @@ jobs:
 
       - name: Validate Flyway migrations
         run: mvn flyway:validate \
-              -Dflyway.url=${{ env.FLYWAY_URL }} \
-              -Dflyway.user=${{ env.FLYWAY_USER }} \
-              -Dflyway.password=${{ env.FLYWAY_PASSWORD }}
+              -Dflyway.url=${{ secrets.FLYWAY_URL }} \
+              -Dflyway.user=${{ secrets.FLYWAY_USER }} \
+              -Dflyway.password=${{ secrets.FLYWAY_PASSWORD }}
 
       - name: Start app
         run: mvn spring-boot:run &
