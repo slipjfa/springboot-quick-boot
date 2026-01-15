@@ -1,4 +1,4 @@
-name: Deploy to Oracle VM
+name: Deploy to Oracle
 
 on:
   push:
@@ -10,18 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Build app
+        run: mvn clean package -DskipTests
+
+      - name: Validate Flyway migrations
+        run: mvn -DskipTests flyway:validate
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ secrets.SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/springboot-quick-boot
             git pull
-            docker compose -f compose.prod.yaml down
+
             docker compose -f compose.prod.yaml up -d --build
+
+            # ---- HEALTH CHECK (THIS IS THE PART YOU ASKED ABOUT) ----
+            for i in {1..20}; do
+              if curl -fs http://localhost:8080/actuator/health; then
+                echo "App is healthy"
+                exit 0
+              fi
+              echo "Waiting for app..."
+              sleep 3
+            done
+
+            echo "App failed to start"
+            exit 1
