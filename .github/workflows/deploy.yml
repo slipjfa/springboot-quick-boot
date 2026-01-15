@@ -1,23 +1,79 @@
-name: Deploy to Oracle
+name: CI + Deploy to Oracle
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  deploy:
+  ci:
+    name: Build + Migrate + Health Check
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: demo
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U demo"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/demo
+      SPRING_DATASOURCE_USERNAME: demo
+      SPRING_DATASOURCE_PASSWORD: demo
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build app
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build
         run: mvn clean package -DskipTests
 
-      - name: Validate Flyway migrations
-        run: mvn -DskipTests flyway:validate
+      - name: Run Flyway migrations
+        run: mvn flyway:migrate
+
+      - name: Start app
+        run: mvn spring-boot:run &
+      
+      - name: Wait for app health
+        run: |
+          for i in {1..20}; do
+            if curl -fs http://localhost:8080/actuator/health; then
+              echo "App is healthy"
+              exit 0
+            fi
+            echo "Waiting for app..."
+            sleep 3
+          done
+          echo "App failed to start"
+          exit 1
+
+  deploy:
+    name: Deploy to Oracle
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
@@ -26,20 +82,24 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
+
             cd ~/springboot-quick-boot
             git pull
 
+            docker compose -f compose.prod.yaml down
             docker compose -f compose.prod.yaml up -d --build
 
-            # ---- HEALTH CHECK (THIS IS THE PART YOU ASKED ABOUT) ----
+            echo "Waiting for prod app..."
+
             for i in {1..20}; do
               if curl -fs http://localhost:8080/actuator/health; then
-                echo "App is healthy"
+                echo "Prod app is healthy"
                 exit 0
               fi
-              echo "Waiting for app..."
               sleep 3
             done
 
-            echo "App failed to start"
+            echo "Prod app failed to start"
+            docker compose -f compose.prod.yaml logs --tail=200
             exit 1
