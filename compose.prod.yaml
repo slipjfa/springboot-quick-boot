@@ -1,12 +1,13 @@
 services:
   app:
-    image: your-dockerhub-username/spring-demo:latest
+    build: .
     ports:
       - "8080:8080"
     env_file:
       - .env.prod
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:16
@@ -16,6 +17,11 @@ services:
       POSTGRES_PASSWORD: demo
     volumes:
       - pgdata-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata-prod:
