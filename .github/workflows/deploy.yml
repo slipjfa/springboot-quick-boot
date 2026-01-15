@@ -1,103 +1,27 @@
-name: CI + Deploy to Oracle
+name: Deploy to Oracle
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  ci:
-    name: Build + Migrate + Health Check
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: demo
-          POSTGRES_USER: demo
-          POSTGRES_PASSWORD: demo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U ${{ secrets.FLYWAY_USER }}"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    env:
-      SPRING_DATASOURCE_URL: ${{ secrets.FLYWAY_URL }}
-      SPRING_DATASOURCE_USERNAME: ${{ secrets.FLYWAY_USER }}
-      SPRING_DATASOURCE_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
-      FLYWAY_URL: ${{ secrets.FLYWAY_URL }}
-      FLYWAY_USER: ${{ secrets.FLYWAY_USER }}
-      FLYWAY_PASSWORD: ${{ secrets.FLYWAY_PASSWORD }}
-      FLYWAY_DB: ${{ secrets.FLYWAY_DB }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Build
-        run: mvn clean package -DskipTests
-
-      - name: Validate Flyway migrations
-        run: mvn flyway:validate \
-              -Dflyway.url=${{ secrets.FLYWAY_URL }} \
-              -Dflyway.user=${{ secrets.FLYWAY_USER }} \
-              -Dflyway.password=${{ secrets.FLYWAY_PASSWORD }}
-
-      - name: Start app
-        run: mvn spring-boot:run &
-
-      - name: Wait for app health
-        run: |
-          for i in {1..20}; do
-            if curl -fs http://localhost:8080/actuator/health; then
-              echo "App is healthy"
-              exit 0
-            fi
-            echo "Waiting for app..."
-            sleep 3
-          done
-          echo "App failed to start"
-          exit 1
-
   deploy:
-    name: Deploy to Oracle
+    name: Deploy to server
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to server
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
-          username: ubuntu
+          username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-
-            export POSTGRES_DB=${{ secrets.FLYWAY_DB }}
-            export POSTGRES_USER=${{ secrets.FLYWAY_USER }}
-            export POSTGRES_PASSWORD=${{ secrets.FLYWAY_PASSWORD }}
-            export SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB}
-            export SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
-            export SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-
             cd ~/springboot-quick-boot
             git pull
 

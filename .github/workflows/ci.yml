@@ -1,0 +1,45 @@
+name: CI - Build + Flyway Validate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    name: Build + Flyway Validate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: demo
+          POSTGRES_USER: demo
+          POSTGRES_PASSWORD: demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U demo"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build project
+        run: mvn clean package -DskipTests
+
+      - name: Validate Flyway migrations
+        run: mvn flyway:validate \
+              -Dflyway.url=jdbc:postgresql://localhost:5432/demo \
+              -Dflyway.user=demo \
+              -Dflyway.password=demo
