@@ -5,9 +5,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 @Service
-public class UpdateProductService {
+public class UpdateProductService implements Command<Void, String> {
 
-    public ResponseEntity<String> execute() {
+    @Override
+    public ResponseEntity<String> execute(Void input) {
         return ResponseEntity.status(HttpStatus.OK).body("Product updated.");
     }
 }

@@ -1,6 +1,5 @@
 package com.example.demo.product;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,36 +12,41 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/products")
 public class ProductController {
 
-    @Autowired
-    private CreateProductService createProductService;
+    private final CreateProductService createProductService;
+    private final GetProductService getProductService;
+    private final UpdateProductService updateProductService;
+    private final DeleteProductService deleteProductService;
 
-    @Autowired
-    private GetProductService getProductService;
-
-    @Autowired
-    private UpdateProductService updateProductService;
-
-    @Autowired
-    private DeleteProductService deleteProductService;
+    public ProductController(
+        CreateProductService createProductService,
+        GetProductService getProductService,
+        UpdateProductService updateProductService,
+        DeleteProductService deleteProductService
+    ) {
+        this.createProductService = createProductService;
+        this.getProductService = getProductService;
+        this.updateProductService = updateProductService;
+        this.deleteProductService = deleteProductService;
+    }
 
     @PostMapping
     public ResponseEntity<String> createProduct() {
-        return createProductService.execute();
+        return createProductService.execute(null);
     }
 
     @GetMapping
     public ResponseEntity<String> getProduct() {
-        return getProductService.execute();
+        return getProductService.execute(null);
     }
 
     @PutMapping
     public ResponseEntity<String> updateProduct() {
-        return updateProductService.execute();
+        return updateProductService.execute(null);
     }
 
     @DeleteMapping
     public ResponseEntity<String> deleteProduct() {
-        return deleteProductService.execute();
+        return deleteProductService.execute(null);
     }    
 
 }
